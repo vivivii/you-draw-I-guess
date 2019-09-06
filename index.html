@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no">
+    <title>聊天室</title>
+    <link type="text/css" rel="stylesheet" href="style.css"> 
+    <script type="text/javascript" src="https://libs.baidu.com/jquery/1.11.1/jquery.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.1/socket.io.js"></script>
+<script>
+    var socket = io('ws://localhost:8081');
+    var uname = null;
+    var word = null;
+    $(function(){
+        /*登录*/
+        $('.login-btn').click(function(){
+            console.log("hei!");
+            uname = $.trim($('#loginName').val());
+            if(uname){
+                /*向服务端发送登录事件*/
+                socket.emit('login',{username:uname})
+            }else{
+                alert('请输入昵称')
+            }
+        })
+
+        /*登录成功*/
+        socket.on('loginSuccess',function(data){
+            if(data.username === uname){
+                checkin(data)
+            }else{
+                alert('用户名不匹配，请重试')
+            }
+        })
+
+        /*登录失败*/
+        socket.on('loginFail',function(){
+            alert('昵称重复')
+        })
+
+        /*新人加入提示*/
+        socket.on('add',function(data){
+            var html = '<p>系统消息:'+data.username+'已加入群聊</p>'+'<br>';
+            $('.chat-con').append(html);
+        })
+
+        /*隐藏登录界面 显示聊天界面*/
+        function checkin(data){
+            $('.login-wrap').hide('slow');
+            $('.chat-wrap').show('slow');
+        }
+
+        /*返回聊天*/
+        $('.return-btn').click(function(){
+        $('.room-wrap').hide('slow');
+        $('.chat-wrap').show('slow');
+            socket.emit('leaveroom');
+            socket.on('notroom',function(data){
+                console.log('get!');
+                var html = '<p>系统消息:玩家'+data+'已离开房间</p>'+'<br>';
+                $('.name-con').append(html);
+                })
+        })
+
+        socket.on('leave',function(name){
+            if(name != null){
+                var html = '<p>系统消息:'+name+'已退出群聊</p>'+'<br>';
+                $('.chat-con').append(html);
+            }
+        })
+
+        $('.sendBtn').click(function(){
+            sendMessage()
+        });
+
+        $(document).keydown(function(event){
+            if(event.keyCode == 13){
+                sendMessage()
+            }
+        })
+
+        function sendMessage(){
+            var txt = $('#sendtxt').val();
+            $('#sendtxt').val('');
+            if(txt){
+                socket.emit('sendMessage',{username:uname,message:txt});
+
+            }
+        }
+
+        socket.on('receiveMessage',function(data){
+            showMessage(data)
+        })
+
+        /*显示消息*/
+        function showMessage(data){
+            var html
+            if(data.username === uname){
+                html = '<div class="chat-item item-right clearfix"><span class="img fr"></span><span class="message fr">'+data.message+'</span></div>'
+            }else{
+                html='<div class="chat-item item-left clearfix rela"><span class="abs uname">'+data.username+'</span><span class="img fl"></span><span class="fl message">'+data.message+'</span></div>'
+            }
+            $('.chat-con').append(html);
+        }
+
+    })
+</script>
+  </head>
+<body>
+
+    <div class="login-wrap">
+        <div class="login-con">
+            <h3>用户登录</h3>
+            <input type="text" placeholder="请输入昵称" id="loginName">
+            <button class="login-btn">登录</button>
+        </div>
+    </div>
+
+    <div class="chat-wrap hide">
+        <h1>多人聊天室</h1>
+        <div class="chat-con clearfix"></div>
+        <div class="bottom">
+            <input type="text" id="sendtxt">
+            <button class="sendBtn">发送</button>
+        </div>
+
+        <script>
+            var number;
+            var ck = function(){
+            var x = prompt ("请输入房间id(请输入1)");
+            if(x == "")
+                alert('id不得为空');
+            else if(x == null);
+            else if(x != 1)
+                alert('请输入1  QWQ');
+            else{
+                $('.chat-wrap').hide('slow');
+                $('.room-wrap').show('slow');
+                socket.emit('joinroom',x);
+                socket.on('addroom',function(username,num){
+                    var html = '<p>系统消息:玩家'+username+'已加入房间</p>'+'<br>';
+                    $('.name-con').append(html);
+                    $('.name-con').append('<p>请点击确认</p><br>');
+                    num = num + 1;
+                    var message = "<p>当前房间人数:"+num+"</p><br>";
+                    number = num;
+                    $('.name-con').append(message);
+                 })
+            }
+            }
+        </script>
+        <button class="room-btn" onclick = "ck();">选择房间</button>
+    </div>
+
+    <div class="room-wrap hide">
+      <div class = "text-align: center;"><h1>房间</h1></div>
+      <div class="name-con clearfix"></div>
+      <button class="return-btn" style = "z-index:3;position:fixed;">返回聊天</button>
+
+      <!-- canvas画板 -->
+      <script type="text/javascript">
+		window.onload = function()
+		{
+			var canvas = document.getElementById("canvas");
+			var Context = canvas.getContext('2d');
+			Context.lineWidth = '1';
+            Context.strokeStyle = 'black';
+			canvas.onmousedown = function(e){
+			var e = e||window.event;
+            //获得鼠标按下是当前点的X轴的坐标
+            var starX = e.offsetX||e.layerX;
+            //获得鼠标按下是当前点的Y轴的坐标
+            var starY = e.offsetY||e.layerY;					
+            console.log(starX+'|'+starY);
+            //开始画线，起始位置
+			Context.beginPath();  //开始画画
+			Context.moveTo(starX,starY);   //设置开始画画的xy坐标 就是上面鼠标按下时的位置	
+            canvas.onmousemove = function(e)   //给画板里加移动事件
+            {
+                var e = e||window.event;
+                var endx = e.offsetX||e.layerX;  
+                var endy = e.offsetY||e.layerY;
+                Context.lineTo(endx,endy);   //设置结束画画的xy坐标,就是鼠标一直在画板里面一直移动的获取的xy
+                Context.stroke();     //连接或当作结束画画
+            }
+            canvas.onmouseup = function()  //当在画板上鼠标松开的时候
+            {
+                canvas.onmousemove = null;  //清除鼠标移动事件 
+                var imagedata = canvas.toDataURL();
+                socket.emit('newdraw',imagedata);
+
+            }
+			//一直都是在操作画板的id注意！！	
+			}
+            var btn = document.getElementById("btn");
+            btn.onclick = function()   //橡皮
+            { 
+                Context.strokeStyle = 'white';  //把画笔颜色换成和背景一样的颜色  
+            }
+            var color = document.getElementById("color");
+            var t;
+            color.onclick = function() //选颜色
+            {
+                canvas.style.cursor = 'url(brush.cur),auto';  //点击选颜色 
+            }
+            color.onchange = function()
+            {
+                Context.strokeStyle = color.value; //颜色改变时把颜色值给画笔 
+            }
+            var huabi = document.getElementById("huabi");
+            var txt = document.getElementById("text");
+            huabi.onchange = function()  //画笔粗细
+            {
+                txt.value = huabi.value;
+                Context.lineWidth = txt.value;
+            }
+            var re = document.getElementById("re");
+            re.onclick = function()  //重置画板
+            {
+                Context.clearRect(1,20,1000,500); 
+                var imagedata = canvas.toDataURL();
+                socket.emit('newdraw',imagedata);
+            }
+
+    }		
+    </script>
+
+    <div class="box">
+		<canvas id="canvas" width="1000" height="500"></canvas>
+			<div class="clear">
+				<input type="button" name="btn" id="btn" class = "btn" value="橡   皮" />
+                <input type="button" class = "btn" value="清空画布" id="re"/>
+                画笔颜色<input type="color" name="" id="color" value="#ffffff" />
+				<div style = "position:absolute;right:30px;top:503px;">画笔粗细        <input type="range" name="" max="20" min="1" id="huabi" value="1" /></div>
+				<input type="text" name="" id="text" value="1" />
+			</div>
+    </div>
+
+    <img id = "drawCanvas" width = "1000" height = "500" style = "position: fixed;; top:30px; right:30px; background:white; z-index: 1;">
+    <script>
+        var drawCanvas = document.getElementById('drawCanvas');
+        var canvas = document.getElementById('canvas');
+        socket.on('newpic',function(data){
+                    $('#drawCanvas').attr('src',data);
+                })
+
+        var now;
+        function change(){
+            x = document.getElementById('prepare');
+            if(x.innerHTML === "准备")
+            {
+                x.innerHTML = "取消准备";
+                socket.emit('preing');
+            }
+            else {
+                x.innerHTML = "准备";
+                socket.emit('unpreing');
+            }
+        }
+        socket.on("prepare",function(data){
+            var html = "<p>当前还有" + data + "人未准备</p><br>";
+            $('.name-con').append(html);
+        })
+
+
+        $('.sendsend').click(function(){
+            sendMessages()
+        });
+
+        $(document).keydown(function(event){
+            if(event.keyCode == 13){
+                sendMessages()
+            }
+        })
+        function sendMessages(){
+            var txt = $('#sendtext').val();
+            $('#sendtext').val('');
+            if(txt){
+                socket.emit('sendMessages',{username:uname,message:txt});
+            }
+        }
+
+        socket.on('receiveMessages',function(data){
+            showMessages(data)
+        })
+
+        /*显示消息*/
+        function showMessages(data){
+            var html;
+            html='<p><span class="abs uname">'+data.username + ':' + '</span><br><span class="img fl"></span><span class="fl message">'+data.message+'</span></p><br>'
+            $('.name-con').append(html);
+        }
+
+
+        function start(){
+                document.getElementById("drawCanvas").style = "width:1000; height:500;position: fixed; top:30px; right:30px; background:white; z-index: 1;";
+                socket.emit('start');
+            }
+
+
+        socket.on('drawer',function(data){
+            var msg = '<p>' + "现在画画的人是：" + data + '</p><br>';
+            $('.name-con').append(msg);
+            if(uname == data){
+                document.getElementById("drawCanvas").style = "width:1000; height:500;position: fixed; top:30px; right:30px; background:white; z-index: -3;";
+                socket.emit('secret',socket.id);
+            }
+
+        })
+
+        socket.on('toDrawer',function(data){
+            var msg = "<p>" + "你现在要画的内容是：" + data + "</p><br>";
+            $('.name-con').append(msg);
+            word = data;
+        })
+
+        socket.on('right',function(data){
+            var msg1 = "<p>" + "玩家" + data + "猜对啦！" + '</p><br>';
+            $('.name-con').append(msg1);
+            var msg2 = "<p>游戏结束</p><br>";
+            $('.name-con').append(msg2);
+            var msg3 = "<p>点击‘开始游戏’开始下一局游戏=v=</p><br>";
+            $('.name-con').append(msg3); 
+            document.getElementById("drawCanvas").style = "width:1000; height:500;position: fixed; top:30px; right:30px; background:white; z-index: 1;";
+        })
+
+    </script>
+
+        <div class="conver">
+                <input type="text" id="sendtext">
+                <button class="sendsend">发送</button>
+        </div>
+
+        <button class = "prepare" onclick="change();" id = "prepare">准备</button>
+        <button class = "start" onclick = "start();" id = "start">开始游戏</button>
+    </div>
+
+</body>
+</html>
